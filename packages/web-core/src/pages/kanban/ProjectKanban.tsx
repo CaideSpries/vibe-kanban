@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Group, Layout, Panel, Separator } from 'react-resizable-panels';
 import { OrgProvider } from '@/shared/providers/remote/OrgProvider';
@@ -10,21 +10,27 @@ import { usePageTitle } from '@/shared/hooks/usePageTitle';
 import { KanbanContainer } from '@/features/kanban/ui/KanbanContainer';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import { ProjectRightSidebarContainer } from './ProjectRightSidebarContainer';
-import { LoginRequiredPrompt } from '@/shared/dialogs/shared/LoginRequiredPrompt';
 import {
   PERSIST_KEYS,
   usePaneSize,
 } from '@/shared/stores/useUiPreferencesStore';
-import { useUserOrganizations } from '@/shared/hooks/useUserOrganizations';
-import { useOrganizationProjects } from '@/shared/hooks/useOrganizationProjects';
-import { useOrganizationStore } from '@/shared/stores/useOrganizationStore';
-import { useAuth } from '@/shared/hooks/auth/useAuth';
-import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
+import { useLocalProjects, useCreateLocalProject } from '@/shared/hooks/useLocalProjects';
 import { useCurrentKanbanRouteState } from '@/shared/hooks/useCurrentKanbanRouteState';
 import {
   buildKanbanIssueComposerKey,
   closeKanbanIssueComposer,
 } from '@/shared/stores/useKanbanIssueComposerStore';
+import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
+import { Button } from '@vibe/ui/components/Button';
+import { Input } from '@vibe/ui/components/Input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@vibe/ui/components/Dialog';
+
 /**
  * Component that registers project mutations with ActionsContext.
  * Must be rendered inside both ActionsProvider and ProjectProvider.
@@ -212,19 +218,11 @@ function ProjectKanbanInner({ projectId }: { projectId: string }) {
 }
 
 /**
- * Hook to find a project by ID, using orgId from Zustand store
+ * Hook to find a local project by ID from SQLite via /api/projects.
+ * No auth guard, no organizationId param — unconditional fetch.
  */
 function useFindProjectById(projectId: string | undefined) {
-  const { isLoaded: authLoaded } = useAuth();
-  const { data: orgsData, isLoading: orgsLoading } = useUserOrganizations();
-  const selectedOrgId = useOrganizationStore((s) => s.selectedOrgId);
-  const organizations = orgsData?.organizations ?? [];
-
-  // Use stored org ID, or fall back to first org
-  const orgIdToUse = selectedOrgId ?? organizations[0]?.id ?? null;
-
-  const { data: projects = [], isLoading: projectsLoading } =
-    useOrganizationProjects(orgIdToUse);
+  const { data: projects = [], isLoading, isError } = useLocalProjects();
 
   const project = useMemo(() => {
     if (!projectId) return undefined;
@@ -233,10 +231,89 @@ function useFindProjectById(projectId: string | undefined) {
 
   return {
     project,
-    organizationId: project?.organization_id ?? selectedOrgId,
-    // Include auth loading state - we can't determine project access until auth loads
-    isLoading: !authLoaded || orgsLoading || projectsLoading,
+    isLoading,
+    isError,
   };
+}
+
+/**
+ * Create Project dialog (UI-SPEC §Create Project Dialog)
+ */
+function CreateProjectDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const createMutation = useCreateLocalProject();
+  const [projectName, setProjectName] = useState('');
+  const [nameError, setNameError] = useState('');
+
+  function handleCreate() {
+    if (!projectName.trim()) {
+      setNameError('Project name is required.');
+      return;
+    }
+    setNameError('');
+    createMutation.mutate(projectName.trim(), {
+      onSuccess: () => {
+        onOpenChange(false);
+        setProjectName('');
+      },
+    });
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      setProjectName('');
+      setNameError('');
+    }
+    onOpenChange(nextOpen);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New Project</DialogTitle>
+        </DialogHeader>
+        <div>
+          <label htmlFor="project-name-input">Name</label>
+          <Input
+            id="project-name-input"
+            placeholder="Project name"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+            autoFocus
+            aria-describedby={nameError ? 'project-name-error' : undefined}
+          />
+          {nameError && (
+            <p id="project-name-error" style={{ color: 'var(--error)' }}>
+              {nameError}
+            </p>
+          )}
+          {createMutation.isError && (
+            <p style={{ color: 'var(--error)' }}>
+              Could not create project. Try again.
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => handleOpenChange(false)}>
+            Discard
+          </Button>
+          <Button
+            onClick={handleCreate}
+            disabled={createMutation.isPending}
+          >
+            {createMutation.isPending ? '…' : 'Create'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 /**
@@ -258,7 +335,6 @@ export function ProjectKanban() {
     useCurrentKanbanRouteState();
   const appNavigation = useAppNavigation();
   const { t } = useTranslation('common');
-  const { isSignedIn, isLoaded: authLoaded } = useAuth();
   const issueComposerKey = useMemo(() => {
     if (!projectId) {
       return null;
@@ -266,6 +342,7 @@ export function ProjectKanban() {
     return buildKanbanIssueComposerKey(hostId, projectId);
   }, [hostId, projectId]);
   const previousIssueComposerKeyRef = useRef<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   useEffect(() => {
     const previousKey = previousIssueComposerKeyRef.current;
@@ -287,45 +364,74 @@ export function ProjectKanban() {
     }
   }, [projectId, hasInvalidWorkspaceCreateDraftId, appNavigation]);
 
-  // Find the project and get its organization
-  const { organizationId, isLoading } = useFindProjectById(
+  // Find the project using the local SQLite hook — no auth guard, no organizationId required
+  const { project, isLoading, isError } = useFindProjectById(
     projectId ?? undefined
   );
 
-  // Show loading while auth state is being determined
-  if (!authLoaded || isLoading) {
+  // Show loading while fetching local projects
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full w-full">
-        <p className="text-low">{t('states.loading')}</p>
+        <p aria-live="polite" className="text-low">
+          Loading projects…
+        </p>
       </div>
     );
   }
 
-  // If not signed in, prompt user to log in
-  if (!isSignedIn) {
-    return (
-      <div className="flex items-center justify-center h-full w-full p-base">
-        <LoginRequiredPrompt
-          className="max-w-md"
-          title={t('kanban.loginRequired.title')}
-          description={t('kanban.loginRequired.description')}
-          actionLabel={t('kanban.loginRequired.action')}
-        />
-      </div>
-    );
-  }
-
-  if (!projectId || !organizationId) {
+  // Fetch error — server may not be running
+  if (isError) {
     return (
       <div className="flex items-center justify-center h-full w-full">
-        <p className="text-low">{t('kanban.noProjectFound')}</p>
+        <p className="text-low">
+          Could not load projects. Check that the VK server is running and try again.
+        </p>
       </div>
     );
   }
 
+  if (!projectId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full gap-double">
+        <p className="text-high font-semibold">No projects yet</p>
+        <p className="text-low">
+          Create a project to start organizing your work.
+        </p>
+        <Button onClick={() => setIsCreateOpen(true)}>New Project</Button>
+        <CreateProjectDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+      </div>
+    );
+  }
+
+  // Project not found by ID — show empty state with create option
+  if (!project) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full gap-double">
+        <p className="text-high font-semibold">No projects yet</p>
+        <p className="text-low">
+          Create a project to start organizing your work.
+        </p>
+        <Button onClick={() => setIsCreateOpen(true)}>New Project</Button>
+        <CreateProjectDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+      </div>
+    );
+  }
+
+  // Render the kanban board wrapped in OrgProvider (Phase 3 will wire real org data).
+  // Pass empty string so OrgProvider disables Electric shape subscriptions (enabled: Boolean('') === false).
   return (
-    <OrgProvider organizationId={organizationId}>
-      <ProjectKanbanInner projectId={projectId} />
-    </OrgProvider>
+    <>
+      <OrgProvider organizationId="">
+        <ProjectKanbanInner projectId={projectId} />
+      </OrgProvider>
+      <Button
+        onClick={() => setIsCreateOpen(true)}
+        style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 50 }}
+      >
+        New Project
+      </Button>
+      <CreateProjectDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+    </>
   );
 }
