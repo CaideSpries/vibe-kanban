@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import { create, useModal } from '@ebay/nice-modal-react';
 import { useTranslation } from 'react-i18next';
-import type { Project } from 'shared/remote-types';
 import type { OrganizationMemberWithProfile } from 'shared/types';
 import { defineModal } from '@/shared/lib/modals';
 import { CommandDialog } from '@vibe/ui/components/Command';
@@ -257,8 +256,8 @@ function AssigneeSelectionWithContext({
 
   // Fallback: try to find org from projects if not in store
   const { data: projects = [] } = useOrganizationProjects(selectedOrgId);
-  const project = projects.find((p: Project) => p.id === resolvedProjectId);
-  const organizationId = project?.organization_id ?? selectedOrgId;
+  const project = projects.find((p) => p.id === resolvedProjectId);
+  const organizationId = (project as any)?.organization_id ?? selectedOrgId;
 
   // If we don't have the required IDs, render nothing
   if (!organizationId || !resolvedProjectId) {

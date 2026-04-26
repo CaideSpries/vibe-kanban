@@ -189,7 +189,7 @@ export function ReposSettingsSection({
   const placeholders = useScriptPlaceholders();
 
   // Linked projects: find which remote projects reference this repo
-  const { data: allProjects, isLoading: projectsLoading } =
+  const { data: allProjects = [], isLoading: projectsLoading } =
     useAllOrganizationProjects();
   const [linkedProjectNames, setLinkedProjectNames] = useState<string[]>([]);
   const [linkedProjectsLoading, setLinkedProjectsLoading] = useState(false);

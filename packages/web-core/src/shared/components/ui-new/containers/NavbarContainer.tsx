@@ -203,7 +203,7 @@ export function NavbarContainer({
   const shouldResolveIssueBreadcrumb =
     shouldResolveBreadcrumbData && !!linkedIssueId;
 
-  const { data: allProjects, isLoading: isProjectsLoading } =
+  const { data: allProjects = [], isLoading: isProjectsLoading } =
     useAllOrganizationProjects({
       enabled: shouldResolveBreadcrumbData,
     });

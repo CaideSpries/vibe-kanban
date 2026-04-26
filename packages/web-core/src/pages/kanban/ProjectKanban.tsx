@@ -334,7 +334,6 @@ export function ProjectKanban() {
   const { projectId, hostId, hasInvalidWorkspaceCreateDraftId } =
     useCurrentKanbanRouteState();
   const appNavigation = useAppNavigation();
-  const { t } = useTranslation('common');
   const issueComposerKey = useMemo(() => {
     if (!projectId) {
       return null;

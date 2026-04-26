@@ -7,7 +7,6 @@ import { useScratch } from '@/shared/hooks/useScratch';
 import { useAllOrganizationProjects } from '@/shared/hooks/useAllOrganizationProjects';
 import { useUserOrganizations } from '@/shared/hooks/useUserOrganizations';
 import { ScratchType, type DraftWorkspaceData } from 'shared/types';
-import type { Project } from 'shared/remote-types';
 import { splitMessageToTitleDescription } from '@/shared/lib/string';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
@@ -307,7 +306,7 @@ export function WorkspacesSidebarContainer({
 
   // Remote data for project filter (all orgs)
   const { workspaces: remoteWorkspaces } = useUserContext();
-  const { data: allRemoteProjects } = useAllOrganizationProjects();
+  const { data: allRemoteProjects = [] } = useAllOrganizationProjects();
   const { data: orgsData } = useUserOrganizations();
   const organizations = useMemo(
     () => orgsData?.organizations ?? [],
@@ -341,11 +340,13 @@ export function WorkspacesSidebarContainer({
       linkedProjectIds.has(p.id)
     );
 
-    const groupMap = new Map<string, Project[]>();
+    const groupMap = new Map<string, any[]>();
     for (const project of relevant) {
-      const arr = groupMap.get(project.organization_id) ?? [];
+      const projectAny = project as any;
+      const orgKey = projectAny.organization_id ?? 'local';
+      const arr = groupMap.get(orgKey) ?? [];
       arr.push(project);
-      groupMap.set(project.organization_id, arr);
+      groupMap.set(orgKey, arr);
     }
 
     return Array.from(groupMap.entries())
