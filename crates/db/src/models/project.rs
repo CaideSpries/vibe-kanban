@@ -33,6 +33,26 @@ impl Project {
         .await
     }
 
+    pub async fn create(pool: &SqlitePool, name: &str) -> Result<Self, sqlx::Error> {
+        let id = Uuid::new_v4();
+        sqlx::query_as!(
+            Project,
+            r#"INSERT INTO projects (id, name)
+               VALUES ($1, $2)
+               RETURNING
+                   id as "id!: Uuid",
+                   name,
+                   default_agent_working_dir,
+                   remote_project_id as "remote_project_id: Uuid",
+                   created_at as "created_at!: DateTime<Utc>",
+                   updated_at as "updated_at!: DateTime<Utc>""#,
+            id,
+            name
+        )
+        .fetch_one(pool)
+        .await
+    }
+
     pub async fn set_remote_project_id(
         pool: &SqlitePool,
         id: Uuid,
