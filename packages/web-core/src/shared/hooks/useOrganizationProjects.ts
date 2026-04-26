@@ -1,23 +1,4 @@
-import { useShape } from '@/shared/integrations/electric/hooks';
-import { PROJECTS_SHAPE } from 'shared/remote-types';
-import { useAuth } from '@/shared/hooks/auth/useAuth';
-
-export function useOrganizationProjects(organizationId: string | null) {
-  const { isSignedIn } = useAuth();
-
-  // Only subscribe to Electric when signed in AND have an org
-  const enabled = isSignedIn && !!organizationId;
-
-  const { data, isLoading, error } = useShape(
-    PROJECTS_SHAPE,
-    { organization_id: organizationId || '' },
-    { enabled }
-  );
-
-  return {
-    data,
-    isLoading,
-    isError: !!error,
-    error,
-  };
-}
+// Cloud sync removed (BloopAI shutdown). Local SQLite replaces Electric sync.
+// Re-export from the new local hook so existing imports can be updated incrementally.
+export { useLocalProjects as useOrganizationProjects, useCreateLocalProject } from './useLocalProjects';
+export type { LocalProject } from './useLocalProjects';
