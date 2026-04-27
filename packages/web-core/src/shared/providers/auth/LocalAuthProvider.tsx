@@ -3,25 +3,20 @@ import {
   AuthContext,
   type AuthContextValue,
 } from '@/shared/hooks/auth/useAuth';
-import { useUserSystem } from '@/shared/hooks/useUserSystem';
 
 interface LocalAuthProviderProps {
   children: ReactNode;
 }
 
+// Local VK: no BloopAI cloud auth required. Always treat as signed-in.
 export function LocalAuthProvider({ children }: LocalAuthProviderProps) {
-  const { loginStatus } = useUserSystem();
-
   const value = useMemo<AuthContextValue>(
     () => ({
-      isSignedIn: loginStatus?.status === 'loggedin',
-      isLoaded: loginStatus !== null,
-      userId:
-        loginStatus?.status === 'loggedin'
-          ? (loginStatus.profile?.user_id ?? null)
-          : null,
+      isSignedIn: true,
+      isLoaded: true,
+      userId: 'local-user',
     }),
-    [loginStatus]
+    []
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
