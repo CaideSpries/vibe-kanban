@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Group, Layout, Panel, Separator } from 'react-resizable-panels';
-import { OrgProvider } from '@/shared/providers/remote/OrgProvider';
-import { useOrgContext } from '@/shared/hooks/useOrgContext';
-import { ProjectProvider } from '@/shared/providers/remote/ProjectProvider';
 import { useProjectContext } from '@/shared/hooks/useProjectContext';
 import { useActions } from '@/shared/hooks/useActions';
 import { usePageTitle } from '@/shared/hooks/usePageTitle';
@@ -15,6 +11,8 @@ import {
   usePaneSize,
 } from '@/shared/stores/useUiPreferencesStore';
 import { useLocalProjects, useCreateLocalProject } from '@/shared/hooks/useLocalProjects';
+import { OrgContext } from '@/shared/hooks/useOrgContext';
+import { ProjectContext } from '@/shared/hooks/useProjectContext';
 import { useCurrentKanbanRouteState } from '@/shared/hooks/useCurrentKanbanRouteState';
 import {
   buildKanbanIssueComposerKey,
@@ -186,34 +184,129 @@ function ProjectKanbanLayout({ projectName }: { projectName: string }) {
 /**
  * Inner component that renders the Kanban board once we have the org context
  */
-function ProjectKanbanInner({ projectId }: { projectId: string }) {
-  const { t } = useTranslation('common');
-  const { projects, isLoading } = useOrgContext();
+/**
+ * Stub OrgContext for local mode — supplies local SQLite projects to all
+ * consumers (KanbanContainer, issue panels, etc.) without Electric sync.
+ */
+function LocalOrgProvider({ children }: { children: React.ReactNode }) {
+  const { data: localProjects = [], isLoading } = useLocalProjects();
 
-  const project = projects.find((p) => p.id === projectId);
+  const projects = useMemo(
+    () =>
+      localProjects.map((p) => ({
+        id: p.id,
+        organization_id: '',
+        name: p.name,
+        color: '',
+        sort_order: 0,
+        created_at: p.created_at ?? '',
+        updated_at: p.created_at ?? '',
+      })),
+    [localProjects]
+  );
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full">
-        <p className="text-low">{t('states.loading')}</p>
-      </div>
-    );
-  }
+  const projectsById = useMemo(
+    () => new Map(projects.map((p) => [p.id, p])),
+    [projects]
+  );
 
-  if (!project) {
-    return (
-      <div className="flex items-center justify-center h-full w-full">
-        <p className="text-low">{t('kanban.noProjectFound')}</p>
-      </div>
-    );
-  }
+  const value = useMemo(
+    () => ({
+      organizationId: '',
+      projects,
+      isLoading,
+      error: null,
+      retry: () => {},
+      insertProject: () => ({ data: { id: '', organization_id: '', name: '', color: '', sort_order: 0, created_at: '', updated_at: '' }, persisted: Promise.resolve({ id: '', organization_id: '', name: '', color: '', sort_order: 0, created_at: '', updated_at: '' }) }),
+      updateProject: () => ({ persisted: Promise.resolve(undefined as any) }),
+      removeProject: () => ({ persisted: Promise.resolve(undefined as any) }),
+      getProject: (id: string) => projectsById.get(id),
+      projectsById,
+      membersWithProfilesById: new Map(),
+    }),
+    [projects, isLoading, projectsById]
+  );
 
+  return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;
+}
+
+/**
+ * Stub ProjectContext for local mode — supplies default kanban statuses
+ * (Todo / In Progress / Done) so the board renders without Electric sync.
+ */
+function LocalProjectProvider({ projectId, children }: { projectId: string; children: React.ReactNode }) {
+  const noop = () => ({ persisted: Promise.resolve(undefined as any) });
+  const noopInsert = <T,>(stub: T) => ({ data: stub, persisted: Promise.resolve(stub) });
+
+  const statuses = useMemo(() => [
+    { id: `${projectId}-todo`,        project_id: projectId, name: 'Todo',        color: '220 70% 50%', sort_order: 0, hidden: false, created_at: '' },
+    { id: `${projectId}-in-progress`, project_id: projectId, name: 'In Progress', color: '40 90% 50%',  sort_order: 1, hidden: false, created_at: '' },
+    { id: `${projectId}-done`,        project_id: projectId, name: 'Done',        color: '140 60% 40%', sort_order: 2, hidden: false, created_at: '' },
+  ], [projectId]);
+
+  const statusesById = useMemo(() => new Map(statuses.map((s) => [s.id, s])), [statuses]);
+  const issuesById = useMemo(() => new Map<string, any>(), []);
+
+  const value = useMemo(() => ({
+    projectId,
+    issues: [],
+    statuses,
+    tags: [],
+    issueAssignees: [],
+    issueFollowers: [],
+    issueTags: [],
+    issueRelationships: [],
+    pullRequests: [],
+    pullRequestIssues: [],
+    workspaces: [],
+    isLoading: false,
+    error: null,
+    retry: () => {},
+    insertIssue: (data: any) => noopInsert({ id: '', ...data }),
+    updateIssue: noop,
+    removeIssue: noop,
+    insertStatus: (data: any) => noopInsert({ id: '', ...data }),
+    updateStatus: noop,
+    removeStatus: noop,
+    insertTag: (data: any) => noopInsert({ id: '', ...data }),
+    updateTag: noop,
+    removeTag: noop,
+    insertIssueAssignee: (data: any) => noopInsert({ id: '', ...data }),
+    removeIssueAssignee: noop,
+    insertIssueFollower: (data: any) => noopInsert({ id: '', ...data }),
+    removeIssueFollower: noop,
+    insertIssueTag: (data: any) => noopInsert({ id: '', ...data }),
+    removeIssueTag: noop,
+    insertIssueRelationship: (data: any) => noopInsert({ id: '', ...data }),
+    removeIssueRelationship: noop,
+    insertPullRequestIssue: (data: any) => noopInsert({ id: '', ...data }),
+    removePullRequestIssue: noop,
+    getIssue: (_id: string) => undefined,
+    getIssuesForStatus: (_id: string) => [],
+    getAssigneesForIssue: (_id: string) => [],
+    getFollowersForIssue: (_id: string) => [],
+    getTagsForIssue: (_id: string) => [],
+    getTagObjectsForIssue: (_id: string) => [],
+    getRelationshipsForIssue: (_id: string) => [],
+    getStatus: (id: string) => statusesById.get(id),
+    getTag: (_id: string) => undefined,
+    getPullRequestsForIssue: (_id: string) => [],
+    getWorkspacesForIssue: (_id: string) => [],
+    issuesById,
+    statusesById,
+    tagsById: new Map(),
+  }), [projectId, statuses, statusesById, issuesById]);
+
+  return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
+}
+
+function ProjectKanbanInner({ projectId, projectName }: { projectId: string; projectName: string }) {
   return (
-    <ProjectProvider projectId={projectId}>
+    <LocalProjectProvider projectId={projectId}>
       <ProjectMutationsRegistration>
-        <ProjectKanbanLayout projectName={project.name} />
+        <ProjectKanbanLayout projectName={projectName} />
       </ProjectMutationsRegistration>
-    </ProjectProvider>
+    </LocalProjectProvider>
   );
 }
 
@@ -417,13 +510,11 @@ export function ProjectKanban() {
     );
   }
 
-  // Render the kanban board wrapped in OrgProvider (Phase 3 will wire real org data).
-  // Pass empty string so OrgProvider disables Electric shape subscriptions (enabled: Boolean('') === false).
   return (
     <>
-      <OrgProvider organizationId="">
-        <ProjectKanbanInner projectId={projectId} />
-      </OrgProvider>
+      <LocalOrgProvider>
+        <ProjectKanbanInner projectId={projectId} projectName={project.name} />
+      </LocalOrgProvider>
       <Button
         onClick={() => setIsCreateOpen(true)}
         style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 50 }}

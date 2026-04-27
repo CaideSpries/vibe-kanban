@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DropResult } from '@hello-pangea/dnd';
 import { Outlet, useNavigate, useParams } from '@tanstack/react-router';
 import { siDiscord, siGithub } from 'simple-icons';
@@ -19,8 +19,6 @@ import { NavbarContainer } from './NavbarContainer';
 import { AppBar, type AppBarHostStatus } from '@vibe/ui/components/AppBar';
 import { MobileDrawer } from '@vibe/ui/components/MobileDrawer';
 import { AppBarUserPopoverContainer } from './AppBarUserPopoverContainer';
-import { useUserOrganizations } from '@/shared/hooks/useUserOrganizations';
-import { useOrganizationStore } from '@/shared/stores/useOrganizationStore';
 import { useAuth } from '@/shared/hooks/auth/useAuth';
 import { useDiscordOnlineCount } from '@/shared/hooks/useDiscordOnlineCount';
 import { useGitHubStars } from '@/shared/hooks/useGitHubStars';
@@ -34,27 +32,28 @@ import {
   isProjectDestination,
   isLocalWorkspacesDestination,
 } from '@/shared/lib/routes/appNavigation';
-import {
-  CreateRemoteProjectDialog,
-  type CreateRemoteProjectResult,
-} from '@/shared/dialogs/org/CreateRemoteProjectDialog';
-import { OAuthDialog } from '@/shared/dialogs/global/OAuthDialog';
 import { SettingsDialog } from '@/shared/dialogs/settings/SettingsDialog';
+import { OAuthDialog } from '@/shared/dialogs/global/OAuthDialog';
 import { CommandBarDialog } from '@/shared/dialogs/command-bar/CommandBarDialog';
 import { useCommandBarShortcut } from '@/shared/hooks/useCommandBarShortcut';
 import { useWorkspaceSidebarPreviewController } from '@/shared/hooks/useWorkspaceSidebarPreviewController';
-import { useShape } from '@/shared/integrations/electric/hooks';
-import { sortProjectsByOrder } from '@/shared/lib/projectOrder';
 import {
-  PROJECT_MUTATION,
-  PROJECTS_SHAPE,
-  type Project as RemoteProject,
 } from 'shared/remote-types';
 import { AppBarNotificationBellContainer } from '@/pages/workspaces/AppBarNotificationBellContainer';
 import { WorkspacesSidebarContainer } from '@/pages/workspaces/WorkspacesSidebarContainer';
 import { WorkspacesSidebarReopenTag } from '@vibe/ui/components/WorkspacesSidebar';
 import { useRemoteCloudHostsAppBarModel } from '@/shared/hooks/useRemoteCloudHosts';
+import { useLocalProjects, useCreateLocalProject } from '@/shared/hooks/useLocalProjects';
 import { CloudShutdownExportBanner } from '@/shared/components/CloudShutdownExportBanner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@vibe/ui/components/Dialog';
+import { Button } from '@vibe/ui/components/Button';
+import { Input } from '@vibe/ui/components/Input';
 
 export function SharedAppLayout() {
   const appNavigation = useAppNavigation();
@@ -71,6 +70,9 @@ export function SharedAppLayout() {
   const { data: onlineCount } = useDiscordOnlineCount();
   const { data: starCount } = useGitHubStars();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isLocalCreateOpen, setIsLocalCreateOpen] = useState(false);
+  const [localProjectName, setLocalProjectName] = useState('');
+  const createLocalProject = useCreateLocalProject();
   const [isAppBarHovered, setIsAppBarHovered] = useState(false);
   const { hosts: remoteCloudHosts } = useRemoteCloudHostsAppBarModel();
   const { hostId: routeHostId } = useParams({ strict: false });
@@ -95,76 +97,17 @@ export function SharedAppLayout() {
     };
   }, [isMobile, mobileFontScale]);
 
-  // AppBar state - organizations and projects
-  const { data: orgsData } = useUserOrganizations();
-  const organizations = useMemo(
-    () => orgsData?.organizations ?? [],
-    [orgsData?.organizations]
+  // AppBar state - local projects (VKP-01: local SQLite, no org/BloopAI)
+  const { data: localProjects = [], isLoading } = useLocalProjects();
+  const orderedProjects = useMemo(
+    () =>
+      localProjects.map((p: import('@/shared/hooks/useLocalProjects').LocalProject) => ({
+        ...p,
+        color: `${p.id.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) % 360} 70% 50%`,
+      })),
+    [localProjects]
   );
-
-  const selectedOrgId = useOrganizationStore((s) => s.selectedOrgId);
-  const setSelectedOrgId = useOrganizationStore((s) => s.setSelectedOrgId);
-  const prevOrgIdRef = useRef<string | null>(null);
-
-  // Auto-select first org if none selected or selection is invalid
-  useEffect(() => {
-    if (organizations.length === 0) return;
-
-    const hasValidSelection = selectedOrgId
-      ? organizations.some((org) => org.id === selectedOrgId)
-      : false;
-
-    if (!selectedOrgId || !hasValidSelection) {
-      const firstNonPersonal = organizations.find((org) => !org.is_personal);
-      setSelectedOrgId((firstNonPersonal ?? organizations[0]).id);
-    }
-  }, [organizations, selectedOrgId, setSelectedOrgId]);
-
-  const projectParams = useMemo(
-    () => ({ organization_id: selectedOrgId || '' }),
-    [selectedOrgId]
-  );
-  const {
-    data: orgProjects = [],
-    isLoading,
-    updateMany: updateManyProjects,
-  } = useShape(PROJECTS_SHAPE, projectParams, {
-    enabled: isSignedIn && !!selectedOrgId,
-    mutation: PROJECT_MUTATION,
-  });
-  const sortedProjects = useMemo(
-    () => sortProjectsByOrder(orgProjects),
-    [orgProjects]
-  );
-  const [orderedProjects, setOrderedProjects] =
-    useState<RemoteProject[]>(sortedProjects);
-  const [isSavingProjectOrder, setIsSavingProjectOrder] = useState(false);
-
-  useEffect(() => {
-    if (isSavingProjectOrder) {
-      return;
-    }
-    setOrderedProjects(sortedProjects);
-  }, [isSavingProjectOrder, sortedProjects]);
-
-  // Navigate to the first ordered project when org changes
-  useEffect(() => {
-    if (
-      prevOrgIdRef.current !== null &&
-      prevOrgIdRef.current !== selectedOrgId &&
-      selectedOrgId &&
-      !isLoading
-    ) {
-      if (sortedProjects.length > 0) {
-        appNavigation.goToProject(sortedProjects[0].id);
-      } else {
-        appNavigation.goToWorkspaces();
-      }
-      prevOrgIdRef.current = selectedOrgId;
-    } else if (prevOrgIdRef.current === null && selectedOrgId) {
-      prevOrgIdRef.current = selectedOrgId;
-    }
-  }, [selectedOrgId, sortedProjects, isLoading, appNavigation]);
+  const isSavingProjectOrder = false;
 
   // Navigation state for AppBar active indicators
   const projectDestination = useMemo(
@@ -211,57 +154,16 @@ export function SharedAppLayout() {
   );
 
   const handleProjectsDragEnd = useCallback(
-    async ({ source, destination }: DropResult) => {
-      if (isSavingProjectOrder) {
-        return;
-      }
-      if (!destination || source.index === destination.index) {
-        return;
-      }
-
-      const previousOrder = orderedProjects;
-      const reordered = [...orderedProjects];
-      const [moved] = reordered.splice(source.index, 1);
-
-      if (!moved) {
-        return;
-      }
-
-      reordered.splice(destination.index, 0, moved);
-      setOrderedProjects(reordered);
-      setIsSavingProjectOrder(true);
-
-      try {
-        await updateManyProjects(
-          reordered.map((project, index) => ({
-            id: project.id,
-            changes: { sort_order: index },
-          }))
-        ).persisted;
-      } catch (error) {
-        console.error('Failed to reorder projects:', error);
-        setOrderedProjects(previousOrder);
-      } finally {
-        setIsSavingProjectOrder(false);
-      }
+    (_result: DropResult) => {
+      // local projects: drag-and-drop reorder not persisted
     },
-    [isSavingProjectOrder, orderedProjects, updateManyProjects]
+    []
   );
 
-  const handleCreateProject = useCallback(async () => {
-    if (!selectedOrgId) return;
-
-    try {
-      const result: CreateRemoteProjectResult =
-        await CreateRemoteProjectDialog.show({ organizationId: selectedOrgId });
-
-      if (result.action === 'created' && result.project) {
-        appNavigation.goToProject(result.project.id);
-      }
-    } catch {
-      // Dialog cancelled
-    }
-  }, [selectedOrgId, appNavigation]);
+  const handleCreateProject = useCallback(() => {
+    setLocalProjectName('');
+    setIsLocalCreateOpen(true);
+  }, []);
 
   const handleSignIn = useCallback(async () => {
     try {
@@ -326,7 +228,7 @@ export function SharedAppLayout() {
             />
             {/* Desktop navbar. */}
             <NavbarContainer
-              onOrgSelect={setSelectedOrgId}
+              onOrgSelect={() => {}}
               onOpenDrawer={() => setIsDrawerOpen(true)}
             />
             {/* Desktop AppBar sidebar. */}
@@ -355,9 +257,9 @@ export function SharedAppLayout() {
               }
               userPopover={
                 <AppBarUserPopoverContainer
-                  organizations={organizations}
-                  selectedOrgId={selectedOrgId ?? ''}
-                  onOrgSelect={setSelectedOrgId}
+                  organizations={[]}
+                  selectedOrgId={''}
+                  onOrgSelect={() => {}}
                 />
               }
               starCount={starCount}
@@ -410,7 +312,7 @@ export function SharedAppLayout() {
             )}
             <NavbarContainer
               mobileMode={isMobile}
-              onOrgSelect={setSelectedOrgId}
+              onOrgSelect={() => {}}
               onOpenDrawer={() => setIsDrawerOpen(true)}
             />
             <div className="flex-1 min-h-0 overflow-hidden">
@@ -428,8 +330,7 @@ export function SharedAppLayout() {
             {/* Header: org name + close button */}
             <div className="flex items-center justify-between p-4 border-b border-border">
               <span className="text-sm font-medium text-high truncate">
-                {organizations.find((o) => o.id === selectedOrgId)?.name ??
-                  'Organization'}
+                {'Projects'}
               </span>
               <button
                 type="button"
@@ -480,7 +381,7 @@ export function SharedAppLayout() {
             {/* Project list */}
             <div className="flex-1 overflow-y-auto p-2">
               {isSignedIn ? (
-                orderedProjects.map((project) => (
+                orderedProjects.map((project: { id: string; name: string; color: string }) => (
                   <button
                     type="button"
                     key={project.id}
@@ -550,6 +451,47 @@ export function SharedAppLayout() {
           </div>
         </MobileDrawer>
       </div>
+      <Dialog open={isLocalCreateOpen} onOpenChange={(open) => { if (!open) setLocalProjectName(''); setIsLocalCreateOpen(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Project</DialogTitle>
+          </DialogHeader>
+          <div>
+            <Input
+              placeholder="Project name"
+              value={localProjectName}
+              onChange={(e) => setLocalProjectName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && localProjectName.trim()) {
+                  createLocalProject.mutate(localProjectName.trim(), {
+                    onSuccess: () => { setIsLocalCreateOpen(false); setLocalProjectName(''); },
+                  });
+                }
+              }}
+              autoFocus
+            />
+            {createLocalProject.isError && (
+              <p style={{ color: 'var(--error)', marginTop: '4px', fontSize: '0.875rem' }}>
+                Could not create project. Try again.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsLocalCreateOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!localProjectName.trim()) return;
+                createLocalProject.mutate(localProjectName.trim(), {
+                  onSuccess: () => { setIsLocalCreateOpen(false); setLocalProjectName(''); },
+                });
+              }}
+              disabled={createLocalProject.isPending || !localProjectName.trim()}
+            >
+              {createLocalProject.isPending ? '…' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SyncErrorProvider>
   );
 }

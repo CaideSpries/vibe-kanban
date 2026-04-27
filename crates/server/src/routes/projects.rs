@@ -2,9 +2,10 @@ use axum::{
     Router,
     extract::State,
     response::Json as ResponseJson,
-    routing::{get, post},
+    routing::get,
 };
-use db::models::Project;
+use db::models::project::Project;
+use deployment::Deployment;
 use serde::Deserialize;
 use utils::response::ApiResponse;
 
