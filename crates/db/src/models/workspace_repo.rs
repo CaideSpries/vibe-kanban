@@ -239,7 +239,7 @@ impl WorkspaceRepo {
                  AND workspace_id IN (
                      SELECT w.id FROM workspaces w
                      JOIN tasks t ON w.task_id = t.id
-                     WHERE t.parent_workspace_id = $3
+                     WHERE t.workspace_id = $3
                  )"#,
             new_branch,
             old_branch,

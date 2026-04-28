@@ -149,7 +149,7 @@ impl TaskWithStatus {
                              AND ep.status = 'running'
                        ) THEN 'running'
                        ELSE 'done'
-                   END AS "derived_status!"
+                   END AS "derived_status!: String"
                FROM tasks t
                WHERE t.project_id = $1
                ORDER BY t.created_at ASC"#,

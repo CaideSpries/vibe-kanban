@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT\n                   t.id as \"id!: Uuid\",\n                   t.project_id as \"project_id!: Uuid\",\n                   t.title,\n                   t.description,\n                   t.workspace_id as \"workspace_id: Uuid\",\n                   t.created_at as \"created_at!: DateTime<Utc>\",\n                   t.updated_at as \"updated_at!: DateTime<Utc>\",\n                   CASE\n                       WHEN t.workspace_id IS NULL THEN 'pending'\n                       WHEN EXISTS (\n                           SELECT 1 FROM sessions s\n                           JOIN execution_processes ep ON ep.session_id = s.id\n                           WHERE s.workspace_id = t.workspace_id\n                             AND ep.status = 'running'\n                       ) THEN 'running'\n                       ELSE 'done'\n                   END AS \"derived_status!: String\"\n               FROM tasks t\n               WHERE t.project_id = $1\n               ORDER BY t.created_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "project_id!: Uuid",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "title",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "workspace_id: Uuid",
+        "ordinal": 4,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "derived_status!: String",
+        "ordinal": 7,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "62f7311ed80ee0b9004671cdc4255fa2c75bf44951870d0cc355f337f09bf1a1"
+}

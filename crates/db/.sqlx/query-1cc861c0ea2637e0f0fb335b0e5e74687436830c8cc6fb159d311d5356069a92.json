@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\", project_id as \"project_id!: Uuid\", title, description, status as \"status!: TaskStatus\", parent_workspace_id as \"parent_workspace_id: Uuid\", created_at as \"created_at!: DateTime<Utc>\", updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM tasks\n               WHERE id = $1",
+  "query": "UPDATE tasks SET workspace_id = $1, updated_at = datetime('now','subsec')\n               WHERE id = $2\n               RETURNING\n                   id as \"id!: Uuid\",\n                   project_id as \"project_id!: Uuid\",\n                   title,\n                   description,\n                   status as \"status!: TaskStatus\",\n                   workspace_id as \"workspace_id: Uuid\",\n                   created_at as \"created_at!: DateTime<Utc>\",\n                   updated_at as \"updated_at!: DateTime<Utc>\"",
   "describe": {
     "columns": [
       {
@@ -29,7 +29,7 @@
         "type_info": "Text"
       },
       {
-        "name": "parent_workspace_id: Uuid",
+        "name": "workspace_id: Uuid",
         "ordinal": 5,
         "type_info": "Blob"
       },
@@ -45,7 +45,7 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       true,
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "df66eae37a24c07c2ae0a521c802e3828ac153e6c087edcf2ba4dbe621dc79d3"
+  "hash": "1cc861c0ea2637e0f0fb335b0e5e74687436830c8cc6fb159d311d5356069a92"
 }
