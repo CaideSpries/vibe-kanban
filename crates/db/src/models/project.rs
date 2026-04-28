@@ -70,4 +70,14 @@ impl Project {
 
         Ok(())
     }
+
+    pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "DELETE FROM projects WHERE id = $1",
+            id
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
 }
