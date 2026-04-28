@@ -67,7 +67,7 @@ function TaskCard({
       }`}
       onClick={onClick}
     >
-      <p className="text-sm font-normal text-[var(--text-high)]">{task.name}</p>
+      <p className="text-sm font-normal text-[var(--text-high)]">{task.title}</p>
       <div className="mt-1">
         <StatusBadge status={task.derived_status} />
       </div>
@@ -98,7 +98,7 @@ function NewTaskDialog({
     }
     setNameError("");
     createMutation.mutate(
-      { name: name.trim(), description: description.trim() || undefined },
+      { title: name.trim(), description: description.trim() || undefined },
       {
         onSuccess: () => {
           onOpenChange(false);
@@ -264,26 +264,26 @@ function TaskDetailPanel({
   onClose: () => void;
 }) {
   const patchWorkspace = usePatchTaskWorkspace(projectId);
-  const [name, setName] = useState(task.name);
+  const [name, setName] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
   const [patchError, setPatchError] = useState("");
 
   // Keep local state in sync if task prop changes (e.g. after polling)
-  // Only update if task id or server-modified name/description changes
+  // Only update if task id or server-modified title/description changes
   const [lastTaskId, setLastTaskId] = useState(task.id);
   if (task.id !== lastTaskId) {
     setLastTaskId(task.id);
-    setName(task.name);
+    setName(task.title);
     setDescription(task.description ?? "");
   }
 
-  async function saveField(field: "name" | "description", value: string) {
+  async function saveField(field: "title" | "description", value: string) {
     setPatchError("");
     try {
       const res = await fetch(`/api/tasks/${task.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [field === "name" ? "name" : "description"]: value }),
+        body: JSON.stringify({ [field]: value }),
       });
       if (!res.ok) {
         setPatchError(`Could not save ${field}. Try again.`);
@@ -334,7 +334,7 @@ function TaskDetailPanel({
           id={`task-name-${task.id}`}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onBlur={() => saveField("name", name.trim())}
+          onBlur={() => saveField("title", name.trim())}
         />
       </div>
 

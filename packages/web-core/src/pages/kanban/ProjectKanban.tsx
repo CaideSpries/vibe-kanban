@@ -262,7 +262,7 @@ function LocalProjectProvider({ projectId, children }: { projectId: string; chil
     isLoading: false,
     error: null,
     retry: () => {},
-    insertIssue: (data: any) => noopInsert({ id: '', ...data }),
+    insertIssue: (data: any) => noopInsert({ id: crypto.randomUUID(), ...data }),
     updateIssue: noop,
     removeIssue: noop,
     insertStatus: (data: any) => noopInsert({ id: '', ...data }),

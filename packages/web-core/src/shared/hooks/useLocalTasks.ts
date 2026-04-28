@@ -1,13 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // Task type returned by GET /api/projects/:id/tasks
-// "name" maps from DB "title" (server serializes title field as "title" — verify at runtime)
+// API returns "title" for the task name field (matches DB column name)
 export type DerivedStatus = "pending" | "running" | "done" | "failed";
 
 export interface LocalTask {
     id: string;
     project_id: string;
-    name: string;
+    title: string;
     description: string | null;
     workspace_id: string | null;
     derived_status: DerivedStatus;
@@ -26,7 +26,7 @@ async function fetchTasks(projectId: string): Promise<LocalTask[]> {
 
 async function postTask(
     projectId: string,
-    data: { name: string; description?: string }
+    data: { title: string; description?: string }
 ): Promise<LocalTask> {
     const res = await fetch(`/api/projects/${projectId}/tasks`, {
         method: "POST",
@@ -76,7 +76,7 @@ export function useLocalTasks(projectId: string) {
 export function useCreateLocalTask(projectId: string) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (data: { name: string; description?: string }) =>
+        mutationFn: (data: { title: string; description?: string }) =>
             postTask(projectId, data),
         onSuccess: () =>
             queryClient.invalidateQueries({
