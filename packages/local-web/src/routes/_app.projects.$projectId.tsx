@@ -1,8 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { LocalProjectKanban } from '@/pages/kanban/LocalProjectKanban';
-import { projectSearchValidator } from '@vibe/web-core/project-search';
+import { createFileRoute, useParams } from "@tanstack/react-router";
+import { LocalTaskKanban } from "@/pages/kanban/LocalTaskKanban";
+import { projectSearchValidator } from "@vibe/web-core/project-search";
 
-export const Route = createFileRoute('/_app/projects/$projectId')({
+function LocalProjectRoute() {
+  const { projectId } = useParams({ strict: false });
+  if (!projectId) return null;
+  return <LocalTaskKanban projectId={projectId} />;
+}
+
+export const Route = createFileRoute("/_app/projects/$projectId")({
   validateSearch: projectSearchValidator,
-  component: LocalProjectKanban,
+  component: LocalProjectRoute,
 });
