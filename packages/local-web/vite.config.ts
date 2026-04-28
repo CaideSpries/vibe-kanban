@@ -108,7 +108,9 @@ export default defineConfig({
         ],
       },
     }),
-    sentryVitePlugin({ org: 'bloop-ai', project: 'vibe-kanban' }),
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [sentryVitePlugin({ org: 'bloop-ai', project: 'vibe-kanban' })]
+      : []),
     executorSchemasPlugin(),
   ],
   resolve: {
