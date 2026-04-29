@@ -206,7 +206,7 @@ function DeleteProjectDialog({
         return;
       }
       onOpenChange(false);
-      void navigate({ to: "/projects" });
+      void navigate({ to: "/workspaces" });
     } catch {
       setDeleteError("Could not delete project. Try again.");
       setIsDeleting(false);
