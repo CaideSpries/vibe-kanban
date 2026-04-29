@@ -31,7 +31,7 @@ async function postTask(
     const res = await fetch(`/api/projects/${projectId}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ name: data.title, description: data.description }),
     });
     if (!res.ok) throw new Error(`Failed to create task: ${res.status}`);
     const json = await res.json();
