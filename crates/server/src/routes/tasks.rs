@@ -2,7 +2,7 @@ use axum::{
     Router,
     extract::{Path, State},
     response::Json as ResponseJson,
-    routing::{get, patch, post},
+    routing::{get, patch},
 };
 use db::models::task::{Task, TaskWithStatus};
 use deployment::Deployment;
