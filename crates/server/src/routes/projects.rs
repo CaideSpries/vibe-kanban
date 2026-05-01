@@ -18,6 +18,7 @@ use crate::{
 #[derive(Deserialize)]
 pub struct CreateProjectRequest {
     pub name: String,
+    pub default_agent_working_dir: String,
 }
 
 pub async fn list_projects(
@@ -34,7 +35,17 @@ pub async fn create_project(
     if payload.name.trim().is_empty() {
         return Err(ApiError::BadRequest("Project name is required".to_string()));
     }
-    let project = Project::create(&deployment.db().pool, payload.name.trim()).await?;
+    if payload.default_agent_working_dir.trim().is_empty() {
+        return Err(ApiError::BadRequest(
+            "Working directory is required".to_string(),
+        ));
+    }
+    let project = Project::create(
+        &deployment.db().pool,
+        payload.name.trim(),
+        payload.default_agent_working_dir.trim(),
+    )
+    .await?;
     Ok(ResponseJson(ApiResponse::success(project)))
 }
 

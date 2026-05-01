@@ -33,12 +33,16 @@ impl Project {
         .await
     }
 
-    pub async fn create(pool: &SqlitePool, name: &str) -> Result<Self, sqlx::Error> {
+    pub async fn create(
+        pool: &SqlitePool,
+        name: &str,
+        default_agent_working_dir: &str,
+    ) -> Result<Self, sqlx::Error> {
         let id = Uuid::new_v4();
         sqlx::query_as!(
             Project,
-            r#"INSERT INTO projects (id, name)
-               VALUES ($1, $2)
+            r#"INSERT INTO projects (id, name, default_agent_working_dir)
+               VALUES ($1, $2, $3)
                RETURNING
                    id as "id!: Uuid",
                    name,
@@ -47,7 +51,8 @@ impl Project {
                    created_at as "created_at!: DateTime<Utc>",
                    updated_at as "updated_at!: DateTime<Utc>""#,
             id,
-            name
+            name,
+            default_agent_working_dir
         )
         .fetch_one(pool)
         .await
