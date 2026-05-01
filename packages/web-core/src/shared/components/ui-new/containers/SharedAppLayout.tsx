@@ -72,6 +72,7 @@ export function SharedAppLayout() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLocalCreateOpen, setIsLocalCreateOpen] = useState(false);
   const [localProjectName, setLocalProjectName] = useState('');
+  const [localProjectWorkingDir, setLocalProjectWorkingDir] = useState('');
   const createLocalProject = useCreateLocalProject();
   const [isAppBarHovered, setIsAppBarHovered] = useState(false);
   const { hosts: remoteCloudHosts } = useRemoteCloudHostsAppBarModel();
@@ -451,7 +452,7 @@ export function SharedAppLayout() {
           </div>
         </MobileDrawer>
       </div>
-      <Dialog open={isLocalCreateOpen} onOpenChange={(open) => { if (!open) setLocalProjectName(''); setIsLocalCreateOpen(open); }}>
+      <Dialog open={isLocalCreateOpen} onOpenChange={(open) => { if (!open) { setLocalProjectName(''); setLocalProjectWorkingDir(''); } setIsLocalCreateOpen(open); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Project</DialogTitle>
@@ -462,13 +463,27 @@ export function SharedAppLayout() {
               value={localProjectName}
               onChange={(e) => setLocalProjectName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && localProjectName.trim()) {
-                  createLocalProject.mutate(localProjectName.trim(), {
-                    onSuccess: () => { setIsLocalCreateOpen(false); setLocalProjectName(''); },
+                if (e.key === 'Enter' && localProjectName.trim() && localProjectWorkingDir.trim()) {
+                  createLocalProject.mutate({ name: localProjectName.trim(), default_agent_working_dir: localProjectWorkingDir.trim() }, {
+                    onSuccess: () => { setIsLocalCreateOpen(false); setLocalProjectName(''); setLocalProjectWorkingDir(''); },
                   });
                 }
               }}
               autoFocus
+            />
+          </div>
+          <div>
+            <Input
+              placeholder="Working directory (e.g. bisonet)"
+              value={localProjectWorkingDir}
+              onChange={(e) => setLocalProjectWorkingDir(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && localProjectName.trim() && localProjectWorkingDir.trim()) {
+                  createLocalProject.mutate({ name: localProjectName.trim(), default_agent_working_dir: localProjectWorkingDir.trim() }, {
+                    onSuccess: () => { setIsLocalCreateOpen(false); setLocalProjectName(''); setLocalProjectWorkingDir(''); },
+                  });
+                }
+              }}
             />
             {createLocalProject.isError && (
               <p style={{ color: 'var(--error)', marginTop: '4px', fontSize: '0.875rem' }}>
@@ -480,12 +495,12 @@ export function SharedAppLayout() {
             <Button variant="ghost" onClick={() => setIsLocalCreateOpen(false)}>Cancel</Button>
             <Button
               onClick={() => {
-                if (!localProjectName.trim()) return;
-                createLocalProject.mutate(localProjectName.trim(), {
-                  onSuccess: () => { setIsLocalCreateOpen(false); setLocalProjectName(''); },
+                if (!localProjectName.trim() || !localProjectWorkingDir.trim()) return;
+                createLocalProject.mutate({ name: localProjectName.trim(), default_agent_working_dir: localProjectWorkingDir.trim() }, {
+                  onSuccess: () => { setIsLocalCreateOpen(false); setLocalProjectName(''); setLocalProjectWorkingDir(''); },
                 });
               }}
-              disabled={createLocalProject.isPending || !localProjectName.trim()}
+              disabled={createLocalProject.isPending || !localProjectName.trim() || !localProjectWorkingDir.trim()}
             >
               {createLocalProject.isPending ? '…' : 'Create'}
             </Button>
