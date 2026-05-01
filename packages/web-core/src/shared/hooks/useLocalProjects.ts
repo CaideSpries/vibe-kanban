@@ -8,6 +8,11 @@ export interface LocalProject {
     updated_at: string;
 }
 
+export interface CreateProjectInput {
+    name: string;
+    default_agent_working_dir: string;
+}
+
 async function fetchProjects(): Promise<LocalProject[]> {
     const res = await fetch('/api/projects');
     if (!res.ok) throw new Error(`Failed to fetch projects: ${res.status}`);
@@ -15,11 +20,11 @@ async function fetchProjects(): Promise<LocalProject[]> {
     return json.data ?? json;
 }
 
-async function postProject(name: string): Promise<LocalProject> {
+async function postProject(input: CreateProjectInput): Promise<LocalProject> {
     const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(input),
     });
     if (!res.ok) throw new Error(`Failed to create project: ${res.status}`);
     const json = await res.json();
@@ -34,11 +39,11 @@ export function useLocalProjects() {
     });
 }
 
-// VKP-02: Create a local project and invalidate the list cache on success
+// VKP-AUTO-WD-UI: Create a local project with name + default_agent_working_dir, invalidate list cache on success
 export function useCreateLocalProject() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (name: string) => postProject(name),
+        mutationFn: (input: CreateProjectInput) => postProject(input),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['local-projects'] }),
     });
 }
