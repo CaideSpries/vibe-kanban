@@ -341,26 +341,47 @@ function CreateProjectDialog({
 }) {
   const createMutation = useCreateLocalProject();
   const [projectName, setProjectName] = useState('');
+  const [defaultAgentWorkingDir, setDefaultAgentWorkingDir] = useState('');
   const [nameError, setNameError] = useState('');
+  const [workingDirError, setWorkingDirError] = useState('');
 
   function handleCreate() {
+    let hasError = false;
     if (!projectName.trim()) {
       setNameError('Project name is required.');
-      return;
+      hasError = true;
+    } else {
+      setNameError('');
     }
-    setNameError('');
-    createMutation.mutate(projectName.trim(), {
-      onSuccess: () => {
-        onOpenChange(false);
-        setProjectName('');
+    if (!defaultAgentWorkingDir.trim()) {
+      setWorkingDirError('Working directory is required.');
+      hasError = true;
+    } else {
+      setWorkingDirError('');
+    }
+    if (hasError) return;
+
+    createMutation.mutate(
+      {
+        name: projectName.trim(),
+        default_agent_working_dir: defaultAgentWorkingDir.trim(),
       },
-    });
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+          setProjectName('');
+          setDefaultAgentWorkingDir('');
+        },
+      }
+    );
   }
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
       setProjectName('');
+      setDefaultAgentWorkingDir('');
       setNameError('');
+      setWorkingDirError('');
     }
     onOpenChange(nextOpen);
   }
@@ -385,6 +406,22 @@ function CreateProjectDialog({
           {nameError && (
             <p id="project-name-error" style={{ color: 'var(--error)' }}>
               {nameError}
+            </p>
+          )}
+        </div>
+        <div>
+          <label htmlFor="project-working-dir-input">Working directory</label>
+          <Input
+            id="project-working-dir-input"
+            placeholder="e.g. bisonet"
+            value={defaultAgentWorkingDir}
+            onChange={(e) => setDefaultAgentWorkingDir(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+            aria-describedby={workingDirError ? 'project-working-dir-error' : undefined}
+          />
+          {workingDirError && (
+            <p id="project-working-dir-error" style={{ color: 'var(--error)' }}>
+              {workingDirError}
             </p>
           )}
           {createMutation.isError && (
